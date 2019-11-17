@@ -1049,6 +1049,21 @@ bool kvm_cpuid(struct kvm_vcpu *vcpu, u32 *eax, u32 *ebx,
 	return found;
 }
 EXPORT_SYMBOL_GPL(kvm_cpuid);
+//RN: Method to see if the exit reason exits or not
+bool not_exit_reason(int exit_reason)
+{
+    int i;
+    int not_exit_reasons[4] = {35,38,42,65};
+    
+    if (exit_reason > 68)
+        return true;
+    for (i = 0; i < sizeof(not_exit_reasons)/sizeof(not_exit_reasons[0]); i++)
+    {
+        if (exit_reason == not_exit_reasons[i])
+            return true;
+    }
+    return false;
+}
 
 int kvm_emulate_cpuid(struct kvm_vcpu *vcpu)
 {
