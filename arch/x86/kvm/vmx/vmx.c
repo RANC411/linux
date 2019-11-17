@@ -5853,19 +5853,39 @@ void dump_vmcs(void)
 		pr_err("Virtual processor ID = 0x%04x\n",
 		       vmcs_read16(VIRTUAL_PROCESSOR_ID));
 }
+//RN: Function to calculate the time difference (0x4FFFFFFE)
+static void set_time_difference_in_global_variable(u64 start_time) {
+    u64 end_time = rdtsc();
+    u64 dif_time = end_time - start_time;
+    atomic_long_add(dif_time,&cpu_time_used);
+}
 
+//RN: Function to calculate the time difference for specific exit (0x4FFFFFFC)
+static void set_time_difference_for_specific_exit(u64 start_time, u32 exit_reason) {
+    u64 end_time = rdtsc();
+    u64 dif_time = end_time - start_time;
+    atomic_long_add(dif_time,&cpu_time_used_of_specific_exit[(int)exit_reason]);
+}
 /*
  * The guest has exited.  See if we can fix it or if we need userspace
  * assistance.
  */
 static int vmx_handle_exit(struct kvm_vcpu *vcpu)
 {
-	struct vcpu_vmx *vmx = to_vmx(vcpu);
+    //RN: Determine CPU ticks (0x4FFFFFFE & 0x4FFFFFFC)
+    u64 start_time = rdtsc();
+    
+    struct vcpu_vmx *vmx = to_vmx(vcpu);
 	u32 exit_reason = vmx->exit_reason;
 	u32 vectoring_info = vmx->idt_vectoring_info;
 
 	trace_kvm_exit(exit_reason, vcpu, KVM_ISA_VMX);
+    
+    //RN: Increment global_variable to count the number of exits (0x4FFFFFFF)
+    atomic_inc(&total_number_of_exits);
 
+    //RN: Increment global_variable to count the number of exits of a specific exit (0x4FFFFFFD)
+    atomic_inc(&total_number_of_specific_exit[(int)exit_reason]);
 	/*
 	 * Flush logged GPAs PML buffer, this will make dirty_bitmap more
 	 * updated. Another good is, in kvm_vm_ioctl_get_dirty_log, before
@@ -5945,9 +5965,13 @@ static int vmx_handle_exit(struct kvm_vcpu *vcpu)
 	}
 
 	if (exit_reason < kvm_vmx_max_exit_handlers
-	    && kvm_vmx_exit_handlers[exit_reason])
-		return kvm_vmx_exit_handlers[exit_reason](vcpu);
-	else {
+        && kvm_vmx_exit_handlers[exit_reason]){
+        //RN: Call functions to store time difference (0x4FFFFFFE & 0x4FFFFFFC).
+        set_time_difference_in_global_variable(start_time);
+        set_time_difference_for_specific_exit(start_time,exit_reason);
+        return kvm_vmx_exit_handlers[exit_reason](vcpu);
+	
+    } else {
 		vcpu_unimpl(vcpu, "vmx: unexpected exit reason 0x%x\n",
 				exit_reason);
 		dump_vmcs();

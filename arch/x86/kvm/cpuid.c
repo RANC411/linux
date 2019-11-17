@@ -24,6 +24,19 @@
 #include "trace.h"
 #include "pmu.h"
 
+//RN: Instantiate atomic variable (0x4FFFFFFF)
+atomic_t total_number_of_exits = ATOMIC_INIT(0);
+EXPORT_SYMBOL(total_number_of_exits);
+//RN: Instantiate atomic variable (0x4FFFFFFE)
+atomic_long_t cpu_time_used = ATOMIC_INIT(0);
+EXPORT_SYMBOL(cpu_time_used);
+//RN: Instantiate atomic variable (0x4FFFFFFD)
+atomic_t total_number_of_specific_exit[] = ATOMIC_INIT(0);
+EXPORT_SYMBOL(total_number_of_specific_exit);
+//RN: Instantiate atomic variable (0x4FFFFFFC)
+atomic_long_t cpu_time_used_of_specific_exit[] = ATOMIC_INIT(0);
+EXPORT_SYMBOL(cpu_time_used_of_specific_exit);
+
 static u32 xstate_required_size(u64 xstate_bv, bool compacted)
 {
 	int feature_bit = 0;
@@ -1040,12 +1053,51 @@ EXPORT_SYMBOL_GPL(kvm_cpuid);
 int kvm_emulate_cpuid(struct kvm_vcpu *vcpu)
 {
 	u32 eax, ebx, ecx, edx;
-
+    
+    //RN: define helper variables
+    u32 part1, part2;
+    long time_used;
+    
 	if (cpuid_fault_enabled(vcpu) && !kvm_require_cpl(vcpu, 0))
 		return 1;
 
 	eax = kvm_rax_read(vcpu);
 	ecx = kvm_rcx_read(vcpu);
+    
+    if ((eax == SPECIFIC_EXIT || eax == SPECIFIC_TIME) && not_exit_reason((int)ecx)) {
+        eax = ebx = ecx = 0;
+        edx = 0xFFFFFFFF;
+    } else {
+        switch(eax){
+        case TOTAL_EXITS:
+            //RN: add to %eax the total number of exits.
+            eax = atomic_read(&total_number_of_exits);
+            break;
+        case TOTAL_TIME:
+            //RN: add to %ebx & %ecx the total time spent processing all exits.
+            time_used = atomic_long_read(&cpu_time_used);
+            part1 = (u32)(time_used >> 32);
+            part2 = (u32)(time_used);
+            ebx = part1;
+            ecx = part2;
+            break;
+        case SPECIFIC_EXIT:
+            //RN: add to %eax the total number of exits of a specific exit.
+            eax = atomic_read(&total_number_of_specific_exit[(int)ecx]);
+            break;
+        case SPECIFIC_TIME:
+            //RN: add to %ebx & %ecx the total time spent procesing all exits of a specific exit.
+            time_used = atomic_long_read(&cpu_time_used_of_specific_exit[(int)ecx]);
+            part1 = (u32)(time_used >> 32);
+            part2 = (u32)(time_used);
+            ebx = part1;
+            ecx = part2;
+            break;
+        default:
+            kvm_cpuid(vcpu, &eax, &ebx, &ecx, &edx, true);
+            break;
+        }
+    }
 	kvm_cpuid(vcpu, &eax, &ebx, &ecx, &edx, true);
 	kvm_rax_write(vcpu, eax);
 	kvm_rbx_write(vcpu, ebx);

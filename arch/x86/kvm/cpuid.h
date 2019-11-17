@@ -5,6 +5,22 @@
 #include "x86.h"
 #include <asm/cpu.h>
 #include <asm/processor.h>
+//RN: include ATOMIC header
+#include <linux/atomic.h>
+//RN: define ATOMIC variables for (0x4FFFFFFF)
+extern atomic_t total_number_of_exits;
+//RN: define ATOMIC variables for (0x4FFFFFFE)
+extern atomic_long_t cpu_time_used;
+//RN: define ATOMIC variables for (0x4FFFFFFD)
+extern atomic_t total_number_of_specific_exit[70];
+//RN: define ATOMIC variables for (0x4FFFFFFC)
+extern atomic_long_t cpu_time_used_of_specific_exit[70];
+
+//RN: Define leaf names
+#define TOTAL_EXITS        0x4FFFFFFF
+#define TOTAL_TIME        0x4FFFFFFE
+#define SPECIFIC_EXIT    0x4FFFFFFD
+#define SPECIFIC_TIME    0x4FFFFFFC
 
 int kvm_update_cpuid(struct kvm_vcpu *vcpu);
 bool kvm_mpx_supported(void);
