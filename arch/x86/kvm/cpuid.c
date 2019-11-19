@@ -1113,7 +1113,6 @@ int kvm_emulate_cpuid(struct kvm_vcpu *vcpu)
             break;
         }
     }
-	kvm_cpuid(vcpu, &eax, &ebx, &ecx, &edx, true);
 	kvm_rax_write(vcpu, eax);
 	kvm_rbx_write(vcpu, ebx);
 	kvm_rcx_write(vcpu, ecx);
